@@ -1,0 +1,36 @@
+name: Release
+
+# ship.method nested: this workflow lives in the public addon repo, which holds no tests.
+# The full LuaJIT suite runs in the private project before the tag (skill release).
+# Packaging rules live in .pkgmeta. Remove -d from args to upload; upload needs the
+# CF_API_KEY / WAGO_API_TOKEN / GITHUB_OAUTH secrets and the project IDs in the toc.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Package
+        uses: BigWigsMods/packager@v2
+        with:
+          args: -d -n "{package-name}-{project-version}"
+
+      - name: Keep the zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: PinnoTweaks-zip
+          path: .release/*.zip
+          include-hidden-files: true
+          if-no-files-found: error

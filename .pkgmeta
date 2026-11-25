@@ -1,0 +1,6 @@
+package-as: PinnoTweaks
+
+# ship.method nested: the repo root is the addon folder, so the zip's top folder is the
+# repo itself. Files and folders starting with a dot never package.
+ignore:
+  - README.md

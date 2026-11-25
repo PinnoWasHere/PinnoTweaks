@@ -1,0 +1,12 @@
+## Interface: 16001
+## Title: PinnoTweaks (DaylightUI Plugin)
+## Notes: More ways to style Daylight UI's frames, bars and panels, in Daylight UI's own look. Needs Daylight UI 2.2.7 or newer.
+## Author: PinnoWasHere
+## Version: 0.0.1
+## X-License: All Rights Reserved
+## Dependencies: DaylightUI
+## Category: DaylightUI Plugins
+## Group: PinnoTweaks
+## SavedVariables: PinnoTweaksDB
+
+PinnoTweaks.lua
