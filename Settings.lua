@@ -19,7 +19,8 @@ ns.Bars = Bars
 
 Bars.MODULE = addonName
 
--- Menu order. kinds are the Paint kinds of a scope's frames.
+-- Menu order. kinds are the Paint kinds of a scope's frames. A frame's scope
+-- (Player...) changes its health bar; its power bar has a scope of its own.
 Bars.SCOPES = {
     { key = "all", label = "All frames" },
     { key = "player", label = "Player", kinds = { "unit" } },
@@ -33,6 +34,14 @@ Bars.SCOPES = {
     { key = "targetcast", label = "Target cast bar", kinds = { "castbar" } },
     { key = "focuscast", label = "Focus cast bar", kinds = { "castbar" } },
     { key = "platecast", label = "Nameplate cast bars", kinds = { "platecast" } },
+    { key = "playerpower", label = "Your power bar", kinds = { "unit" } },
+    { key = "targetpower", label = "Target power bar", kinds = { "unit" } },
+    { key = "focuspower", label = "Focus power bar", kinds = { "unit" } },
+    { key = "petpower", label = "Pet power bar", kinds = { "unit", "partypet" } },
+    { key = "partypower", label = "Party power bars", kinds = { "party" } },
+    { key = "raidpower", label = "Raid power bars", kinds = { "raid" } },
+    { key = "arenapower", label = "Arena power bars", kinds = { "unit" } },
+    { key = "platepower", label = "Nameplate power bars", kinds = { "nameplate" } },
     { key = "nameplate", label = "Nameplates", kinds = { "nameplate" } },
 }
 
@@ -92,8 +101,9 @@ end
 local ROW_TYPES = { toggle = true, dropdown = true, slider = true, color = true }
 
 -- def: { key, label, desc?, type, default, kinds, values?, order?, min?, max?,
--- step?, unit? }. Registers before login only, while the defaults and the page
--- are still open. Returns true, or false and why.
+-- step?, unit?, disabled? }. disabled(scope) dims the scope's row while true.
+-- Registers before login only, while the defaults and the page are still open.
+-- Returns true, or false and why.
 function Bars.AddTweak(def)
     if Bars.ready then return false, "too late: register before login" end
     if type(def) ~= "table" or type(def.key) ~= "string" or def.key == "" then return false, "no key" end
@@ -102,6 +112,7 @@ function Bars.AddTweak(def)
     if not ROW_TYPES[def.type] then return false, "unknown row type: " .. tostring(def.type) end
     if def.default == nil then return false, "no default" end
     if type(def.kinds) ~= "table" or #def.kinds == 0 then return false, "no kinds" end
+    if def.disabled ~= nil and type(def.disabled) ~= "function" then return false, "disabled is not a function" end
     Bars.tweaks[#Bars.tweaks + 1] = def
     Bars.byKey[def.key] = def
     for _, s in ipairs(Bars.SCOPES) do

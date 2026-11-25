@@ -39,15 +39,20 @@ items[#items + 1] = { type = "text", label = "No frame tweaks yet. They arrive w
 -- The row fields a tweak passes on to its rows.
 local PASS = { "type", "label", "desc", "values", "order", "min", "max", "step", "unit" }
 
--- One row per scope the tweak applies to. A following bar's rows are dimmed.
+-- One row per scope the tweak applies to. A following bar's rows are dimmed,
+-- and so is a row the tweak's own disabled(scope) says can't act.
 function Bars.AddRows(def)
+    local own = def.disabled
     for _, s in ipairs(Bars.SCOPES) do
         if Bars.Applies(def, s.key) then
-            local row = { key = "bars." .. s.key .. "." .. def.key, hidden = notShown(s.key), tweak = def.key, barScope = s.key }
+            local scope = s.key
+            local row = { key = "bars." .. scope .. "." .. def.key, hidden = notShown(scope), tweak = def.key, barScope = scope }
             for _, field in ipairs(PASS) do row[field] = def[field] end
-            if s.key ~= "all" then
-                local custom = "bars." .. s.key .. ".custom"
-                row.disabled = function(get) return get(custom) ~= true end
+            if scope ~= "all" then
+                local custom = "bars." .. scope .. ".custom"
+                row.disabled = function(get) return get(custom) ~= true or (own ~= nil and own(scope) == true) end
+            elseif own then
+                row.disabled = function() return own(scope) == true end
             end
             items[#items + 1] = row
         end
