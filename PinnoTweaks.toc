@@ -10,3 +10,5 @@
 ## SavedVariables: PinnoTweaksDB
 
 PinnoTweaks.lua
+Settings.lua
+BarsPage.lua
