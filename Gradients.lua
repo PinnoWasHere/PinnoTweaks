@@ -23,15 +23,18 @@ Grad.DIR, Grad.FLIP, Grad.FILL = DIR, FLIP, FILL
 -- Daylight UI internals
 -- ---------------------------------------------------------------------
 
--- Each is { owner, name, table getter, module? }. A module's internals count only
--- while that module is on. docs/reference/daylight-internals.md lists them all.
+-- Each is { owner, name, table getter, module?, type? }. A module's internals
+-- count only while that module is on. type is what the entry must be
+-- ("function" unless given). docs/reference/daylight-internals.md lists them all.
 local function core(key) return function() return DaylightUI[key] end end
+Grad.Core = core
 local function modNs(module, key)
     return function()
         local mod = DaylightUI:GetModule(module)
         return mod and type(mod.ns) == "table" and mod.ns[key] or nil
     end
 end
+Grad.ModNs = modNs
 
 Grad.INTERNALS = {
     { "Gradients", "Paint", core("Gradients") },
@@ -61,17 +64,19 @@ Grad.INTERNALS = {
     { "Plate", "UpdateAll", modNs("Nameplates", "Plate"), "Nameplates" },
 }
 
--- The internals that are missing now, as "Owner.Name" strings.
-function Grad.Missing()
+-- The internals of a list that are missing now, as "Owner.Name" strings.
+function Grad.MissingIn(list)
     local out = {}
-    for _, e in ipairs(Grad.INTERNALS) do
+    for _, e in ipairs(list) do
         if not e[4] or API.IsModuleEnabled(e[4]) then
             local t = e[3]()
-            if type(t) ~= "table" or type(t[e[2]]) ~= "function" then out[#out + 1] = e[1] .. "." .. e[2] end
+            if type(t) ~= "table" or type(t[e[2]]) ~= (e[5] or "function") then out[#out + 1] = e[1] .. "." .. e[2] end
         end
     end
     return out
 end
+
+function Grad.Missing() return Grad.MissingIn(Grad.INTERNALS) end
 
 -- ---------------------------------------------------------------------
 -- Frames and their bars
@@ -108,18 +113,33 @@ local frameScope = setmetatable({}, { __mode = "k" }) -- frame -> its scope (its
 local powerScope = setmetatable({}, { __mode = "k" }) -- frame -> its power bar's scope
 local barScope = setmetatable({}, { __mode = "k" })   -- status bar -> scope
 local frameBars = setmetatable({}, { __mode = "k" })  -- frame -> its bars, a list
-Grad.barScope, Grad.frameScope = barScope, frameScope
+local barFrame = setmetatable({}, { __mode = "k" })   -- status bar -> its frame
+local barPart = setmetatable({}, { __mode = "k" })    -- status bar -> "health", "power" or "bar"
+local frameUnit = setmetatable({}, { __mode = "k" })  -- frame -> its unit, or false
+local framePreview = setmetatable({}, { __mode = "k" }) -- frame -> true for a sample frame
+Grad.barScope, Grad.frameScope, Grad.powerScope = barScope, frameScope, powerScope
+Grad.frameBars, Grad.barFrame, Grad.barPart = frameBars, barFrame, barPart
+Grad.frameUnit, Grad.framePreview, Grad.frameKind = frameUnit, framePreview, frameKind
+
+-- Other files' fn(bar). Each runs after a bar is mapped and after each
+-- repaint a setting change makes.
+local barListeners = {}
+function Grad.OnBar(fn) barListeners[#barListeners + 1] = fn end
+local function barDone(bar)
+    for i = 1, #barListeners do barListeners[i](bar) end
+end
 
 local BAR_PARTS = { unit = { "health", "power" }, party = { "health", "power" }, raid = { "health", "power" },
     partypet = { "health", "power" }, nameplate = { "health", "power" }, castbar = { "bar" }, platecast = { "bar" } }
 
 -- Maps a frame's bars to its scope. Parts can come later than the frame, so
 -- each frame event maps again.
-local function map(kind, frame, unit)
+local function map(kind, frame, unit, isPreview)
     local scope = Grad.ScopeOf(kind, unit)
     local names = BAR_PARTS[kind]
     if not scope or not names then return end
     frameKind[frame], frameScope[frame], powerScope[frame] = kind, scope, POWER_SCOPE[scope]
+    frameUnit[frame], framePreview[frame] = type(unit) == "string" and unit or false, isPreview == true
     local parts = API.Parts(frame)
     if not parts then return end
     local list = frameBars[frame] or {}
@@ -129,9 +149,11 @@ local function map(kind, frame, unit)
         local bar = parts[name]
         if type(bar) == "table" and bar.GetStatusBarTexture then
             barScope[bar] = name == "power" and POWER_SCOPE[scope] or scope
+            barFrame[bar], barPart[bar] = frame, name
             n = n + 1
             list[n] = bar
             if Grad.ApplyFill then Grad.ApplyFill(bar) end
+            barDone(bar)
         end
     end
     for i = #list, n + 1, -1 do list[i] = nil end
@@ -488,11 +510,12 @@ end
 -- The texture lies over the fill in MOD, pinned to the fill's corners and cut
 -- by its masks, so it grows with the fill (no size or value is read) and
 -- multiplies onto Daylight UI's own texture and colors. The Daylight sweep is
--- an image of its own and goes without it.
+-- an image of its own and goes without it. A MOD texture ignores alpha, so it
+-- also goes while Grad.Faded(bar) says the fill is mostly faded (Fills.lua).
 
 local sweepOf = setmetatable({}, { __mode = "k" }) -- bar -> showing the Daylight sweep
 local overlay = setmetatable({}, { __mode = "k" }) -- bar -> our texture over its fill
-Grad.overlay = overlay
+Grad.overlay, Grad.sweepOf = overlay, sweepOf
 
 local function overlayOf(bar)
     local t = overlay[bar]
@@ -511,7 +534,7 @@ function Grad.ApplyFill(bar)
     local scope = barScope[bar]
     if not scope then return end
     local _, _, file = Grad.Resolve(scope)
-    if file and not sweepOf[bar] then
+    if file and not sweepOf[bar] and not (Grad.Faded and Grad.Faded(bar)) then
         local fill = bar:GetStatusBarTexture()
         if not fill then return end
         local t = overlayOf(bar)
@@ -571,15 +594,27 @@ table.insert(Grad.FX.all, { "UnitFrames", "partyCastbar.barFx.style" })
 local held = {}   -- "module:path" -> the Override handle, or false when refused
 local wanted = {} -- reused each sync
 
--- Holds an Override on every effect setting whose scope has its own direction
--- or a fill texture, and lets go of the rest.
+-- Other files' fill looks. fn(scope, module, path) is true while the scope
+-- wears one on the bar that effect setting animates.
+local fxLooks = {}
+function Grad.AddFxLook(fn) fxLooks[#fxLooks + 1] = fn end
+
+local function wearsLook(scope, e)
+    for i = 1, #fxLooks do
+        if fxLooks[i](scope, e[1], e[2]) then return true end
+    end
+    return false
+end
+
+-- Holds an Override on every effect setting whose scope has its own direction,
+-- a fill texture or another fill look, and lets go of the rest.
 function Grad.SyncFx()
     for k in pairs(wanted) do wanted[k] = nil end
     if Grad.installed then
         for scope, list in pairs(Grad.FX) do
             local dir, _, file = Grad.Resolve(scope)
-            if dir or file then
-                for _, e in ipairs(list) do wanted[e[1] .. ":" .. e[2]] = e end
+            for _, e in ipairs(list) do
+                if dir or file or wearsLook(scope, e) then wanted[e[1] .. ":" .. e[2]] = e end
             end
         end
     end
@@ -604,6 +639,59 @@ local HOOKS = {
     { "Gradients", "PaintClassLayers", afterLayers },
 }
 Grad.HOOKS = HOOKS
+
+-- The painters' hooks are on only while some scope has its own direction,
+-- flip or fill texture, so Daylight UI's painters run untouched otherwise.
+local hookHandles = {}
+
+local function unhookAll()
+    for i = #hookHandles, 1, -1 do
+        me.Unhook(hookHandles[i])
+        hookHandles[i] = nil
+    end
+end
+
+-- Puts every hook on, or none. Returns false and the refused one's name.
+local function hookAll()
+    local tables = { Gradients = G, Style = Style }
+    for _, h in ipairs(HOOKS) do
+        local handle
+        if h[4] == "wrap" then handle = me.Wrap(tables[h[1]], h[2], h[3])
+        else handle = me.Hook(tables[h[1]], h[2], h[3]) end
+        if not handle then
+            unhookAll()
+            return false, h[1] .. "." .. h[2]
+        end
+        hookHandles[#hookHandles + 1] = handle
+    end
+    return true
+end
+
+local function anyLook()
+    for _, s in ipairs(Bars.SCOPES) do
+        local dir, flip, file = Grad.Resolve(s.key)
+        if dir or flip or file then return true end
+    end
+    return false
+end
+
+function Grad.SyncHooks()
+    if not Grad.installed then return end
+    local want = anyLook()
+    if want and #hookHandles == 0 then
+        local ok, name = hookAll()
+        if not ok then
+            Grad.installed = false
+            Grad.broken = { name }
+            DEFAULT_CHAT_FRAME:AddMessage(addonName .. ": gradient direction is off. Daylight UI refused a hook on "
+                .. name .. ".")
+        end
+    elseif not want and #hookHandles > 0 then
+        unhookAll()
+    end
+end
+
+function Grad.Hooked() return #hookHandles > 0 end
 
 -- ---------------------------------------------------------------------
 -- Repaint after a change
@@ -636,12 +724,19 @@ function Grad.Repaint(frame)
     end
 end
 
+-- Other files' fn(scope). Each runs on a scope's change, before the repaint.
+local changeListeners = {}
+function Grad.BeforeRepaint(fn) changeListeners[#changeListeners + 1] = fn end
+
 -- Repaints every frame a scope's change reaches, and puts on or takes off its
 -- fill texture and the bar effect overrides. All frames' reaches each frame
 -- that follows it.
 Bars.OnChanged(function(scope)
     forget()
     if not Grad.installed then return end
+    Grad.SyncHooks()
+    if not Grad.installed then return end
+    for i = 1, #changeListeners do changeListeners[i](scope) end
     Grad.SyncFx()
     for frame, s in pairs(frameScope) do
         local p = powerScope[frame]
@@ -649,7 +744,10 @@ Bars.OnChanged(function(scope)
             Grad.Repaint(frame)
             local bars = frameBars[frame]
             if bars then
-                for i = 1, #bars do applyFill(bars[i]) end
+                for i = 1, #bars do
+                    applyFill(bars[i])
+                    barDone(bars[i])
+                end
             end
         end
     end
@@ -659,8 +757,9 @@ end)
 -- Login
 -- ---------------------------------------------------------------------
 
--- Checks every internal, then installs the frame map and the painters' hooks.
--- With one missing, it installs nothing and says so once in chat.
+-- Checks every internal, then installs the frame map, and the painters' hooks
+-- while a scope needs them. With one missing, it installs nothing and says so
+-- once in chat.
 function Grad.Start()
     if Grad.installed or Grad.broken then return end
     local missing = Grad.Missing()
@@ -671,27 +770,17 @@ function Grad.Start()
         return
     end
     G, Style = DaylightUI.Gradients, DaylightUI.Style
-    local tables = { Gradients = G, Style = Style }
-    local handles = {}
-    for _, h in ipairs(HOOKS) do
-        local handle
-        if h[4] == "wrap" then handle = me.Wrap(tables[h[1]], h[2], h[3])
-        else handle = me.Hook(tables[h[1]], h[2], h[3]) end
-        if not handle then
-            for _, done in ipairs(handles) do me.Unhook(done) end
-            Grad.broken = { h[1] .. "." .. h[2] }
-            DEFAULT_CHAT_FRAME:AddMessage(addonName .. ": gradient direction is off. Daylight UI refused a hook on "
-                .. h[1] .. "." .. h[2] .. ".")
-            return
-        end
-        handles[#handles + 1] = handle
-    end
     Grad.installed = true
+    Grad.SyncHooks()
+    if not Grad.installed then return end
     me.Hook(DaylightUI.OptionsPanel, "Show", pageShown)
     me.On("SettingChanged", settingChanged)
     me.On("FrameMade", map)
     me.On("FrameUnitChanged", map)
     me.On("FrameStyled", map)
+    me.On("FrameRemoved", function(_, frame)
+        if frameUnit[frame] then frameUnit[frame] = false end
+    end)
 
     -- Frames painted before login take the saved settings now.
     for frame, scope in pairs(frameScope) do

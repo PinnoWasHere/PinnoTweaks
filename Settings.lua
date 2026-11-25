@@ -101,7 +101,8 @@ end
 local ROW_TYPES = { toggle = true, dropdown = true, slider = true, color = true }
 
 -- def: { key, label, desc?, type, default, kinds, values?, order?, min?, max?,
--- step?, unit?, disabled? }. disabled(scope) dims the scope's row while true.
+-- step?, unit?, disabled?, valuesOf? }. disabled(scope) dims the scope's row
+-- while true. valuesOf(scope) gives a dropdown's values and order per scope.
 -- Registers before login only, while the defaults and the page are still open.
 -- Returns true, or false and why.
 function Bars.AddTweak(def)
@@ -113,6 +114,7 @@ function Bars.AddTweak(def)
     if def.default == nil then return false, "no default" end
     if type(def.kinds) ~= "table" or #def.kinds == 0 then return false, "no kinds" end
     if def.disabled ~= nil and type(def.disabled) ~= "function" then return false, "disabled is not a function" end
+    if def.valuesOf ~= nil and type(def.valuesOf) ~= "function" then return false, "valuesOf is not a function" end
     Bars.tweaks[#Bars.tweaks + 1] = def
     Bars.byKey[def.key] = def
     for _, s in ipairs(Bars.SCOPES) do
@@ -135,9 +137,45 @@ function Bars.Changed(scope)
     for _, fn in ipairs(listeners) do fn(scope) end
 end
 
--- bars.scope is the page's pick and changes nothing on screen.
+-- bars.scope is the page's pick and changes nothing on screen. During Reset
+-- all, the writes wait for one change at the end.
 API.On("SettingChanged", function(scope, path)
-    if scope ~= Bars.MODULE or type(path) ~= "string" then return end
+    if Bars.resetting or scope ~= Bars.MODULE or type(path) ~= "string" then return end
     local s = path:match("^bars%.([^.]+)%.")
     if s and Bars.SCOPE[s] then Bars.Changed(s) end
 end, addonName)
+
+-- ---------------------------------------------------------------------
+-- Reset all
+-- ---------------------------------------------------------------------
+
+-- Daylight UI's own page reset, which puts every row of the Frames page (every
+-- scope's) back to its default. Internals: docs/reference/daylight-internals.md.
+Bars.INTERNALS = {
+    { "Options", "GetPage", function() return DaylightUI.Options end },
+    { "Options", "ResetPage", function() return DaylightUI.Options end },
+}
+
+-- The missing internal's name, or nil.
+function Bars.ResetMissing()
+    for _, e in ipairs(Bars.INTERNALS) do
+        local t = e[3]()
+        if type(t) ~= "table" or type(t[e[2]]) ~= "function" then return e[1] .. "." .. e[2] end
+    end
+    return nil
+end
+
+-- Every PinnoTweaks setting on every scope back to its default, then one
+-- change for All frames: every frame repaints with Daylight UI's own look, and
+-- each tweak lets go of its hooks, overrides and layers. Returns true when done.
+function Bars.ResetAll()
+    if Bars.ResetMissing() then return false end
+    local Options = DaylightUI.Options
+    local page = Options.GetPage(Bars.MODULE .. "." .. Bars.PAGE.id)
+    if not page then return false end
+    Bars.resetting = true
+    Options.ResetPage(page)
+    Bars.resetting = false
+    Bars.Changed("all")
+    return true
+end

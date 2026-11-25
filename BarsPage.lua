@@ -20,6 +20,10 @@ for _, s in ipairs(Bars.SCOPES) do
 end
 
 local items = {
+    { type = "button", label = "Reset all PinnoTweaks", text = "Reset", confirm = true,
+      desc = "Puts every PinnoTweaks setting on every frame back to its default, so your frames look as they do without PinnoTweaks.",
+      disabled = function() return Bars.ResetMissing() ~= nil end,
+      func = function() Bars.ResetAll() end },
     { type = "dropdown", key = PICK, label = "Settings for", values = values, order = order,
       desc = "Which frames the rows below change. A frame follows All frames until you give it settings of its own." },
 }
@@ -48,6 +52,7 @@ function Bars.AddRows(def)
             local scope = s.key
             local row = { key = "bars." .. scope .. "." .. def.key, hidden = notShown(scope), tweak = def.key, barScope = scope }
             for _, field in ipairs(PASS) do row[field] = def[field] end
+            if def.valuesOf then row.values, row.order = def.valuesOf(scope) end
             if scope ~= "all" then
                 local custom = "bars." .. scope .. ".custom"
                 row.disabled = function(get) return get(custom) ~= true or (own ~= nil and own(scope) == true) end

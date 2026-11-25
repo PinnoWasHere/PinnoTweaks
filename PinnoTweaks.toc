@@ -13,3 +13,4 @@ PinnoTweaks.lua
 Settings.lua
 BarsPage.lua
 Gradients.lua
+Fills.lua
