@@ -19,8 +19,9 @@ ns.Bars = Bars
 
 Bars.MODULE = addonName
 
--- Menu order. kinds are the Paint kinds of a scope's frames. A frame's scope
--- (Player...) changes its health bar; its power bar has a scope of its own.
+-- Menu order. kinds are the Paint kinds of a scope's frames ("swing" is
+-- Swing.lua's own). A frame's scope (Player...) changes its health bar; its
+-- power bar has a scope of its own. off(), when set, dims a scope's rows.
 Bars.SCOPES = {
     { key = "all", label = "All frames" },
     { key = "player", label = "Player", kinds = { "unit" } },
@@ -34,6 +35,9 @@ Bars.SCOPES = {
     { key = "targetcast", label = "Target cast bar", kinds = { "castbar" } },
     { key = "focuscast", label = "Focus cast bar", kinds = { "castbar" } },
     { key = "platecast", label = "Nameplate cast bars", kinds = { "platecast" } },
+    { key = "swingmain", label = "Main hand swing", kinds = { "swing" } },
+    { key = "swingoff", label = "Off hand swing", kinds = { "swing" } },
+    { key = "swingranged", label = "Ranged swing", kinds = { "swing" } },
     { key = "playerpower", label = "Your power bar", kinds = { "unit" } },
     { key = "targetpower", label = "Target power bar", kinds = { "unit" } },
     { key = "focuspower", label = "Focus power bar", kinds = { "unit" } },

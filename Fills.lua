@@ -167,7 +167,7 @@ local function file(frame)
 end
 
 local UNIT_KINDS = { unit = true, party = true, raid = true, partypet = true }
-local DARK_KINDS = { nameplate = true, castbar = true, platecast = true }
+local DARK_KINDS = { nameplate = true, castbar = true, platecast = true, swing = true }
 
 local function lookOf(bar)
     local scope = barScope[bar]
@@ -175,7 +175,7 @@ local function lookOf(bar)
 end
 
 -- Dark is Daylight UI's own on unit frame health, so ours paints power,
--- nameplate and cast bars.
+-- nameplate, cast and swing bars.
 local function darkable(bar)
     return barPart[bar] == "power" or DARK_KINDS[frameKind[barFrame[bar]]] == true
 end
@@ -743,7 +743,7 @@ function Fills.Listening() return listening end
 -- The rows
 -- ---------------------------------------------------------------------
 
-local KINDS = { "unit", "party", "raid", "partypet", "castbar", "platecast", "nameplate" }
+local KINDS = { "unit", "party", "raid", "partypet", "castbar", "platecast", "nameplate", "swing" }
 
 -- Does a bar of the scope (or one following All frames) wear three or more colors?
 local function manyColors(scope)
@@ -767,10 +767,11 @@ Bars.AddTweak({
     disabled = Fills.OpacityOff,
 })
 
--- Dark is offered where Daylight UI has none of its own: power, nameplate and
--- cast bars, and All frames (which reaches them).
+-- Dark is offered where Daylight UI has none of its own: power, nameplate,
+-- cast and swing bars, and All frames (which reaches them).
 local DARK_SCOPES = { all = true, castbar = true, targetcast = true, focuscast = true, platecast = true,
     nameplate = true }
+for _, swing in pairs(ns.SwingBars.SCOPE) do DARK_SCOPES[swing] = true end
 for _, power in pairs(Grad.POWER_SCOPE) do
     if power ~= "all" then DARK_SCOPES[power] = true end
 end
@@ -788,7 +789,7 @@ Bars.AddTweak({
         if DARK_SCOPES[scope] then return LOOK_VALUES, LOOK_ORDER end
         return LIGHT_VALUES, LIGHT_ORDER
     end,
-    desc = "Light lifts the fill toward white. Dark paints power, nameplate and cast bars near-black with the empty part in the bar's own color, like Daylight UI's Dark health (unit frame health has that on Daylight UI's Colors page). Either turns this frame's bar effects (Flow, Tide) off.",
+    desc = "Light lifts the fill toward white. Dark paints power, nameplate, cast and swing bars near-black with the empty part in the bar's own color, like Daylight UI's Dark health (unit frame health has that on Daylight UI's Colors page). Either turns this frame's bar effects (Flow, Tide) off.",
     disabled = function() return not Fills.installed end,
 })
 

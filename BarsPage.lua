@@ -43,8 +43,15 @@ items[#items + 1] = { type = "text", label = "No frame tweaks yet. They arrive w
 -- The row fields a tweak passes on to its rows.
 local PASS = { "type", "label", "desc", "values", "order", "min", "max", "step", "unit" }
 
+-- True while a scope's bars can't be reached (its off(), Swing.lua's).
+local function scopeOff(scope)
+    local off = Bars.SCOPE[scope].off
+    return off ~= nil and off() == true
+end
+
 -- One row per scope the tweak applies to. A following bar's rows are dimmed,
--- and so is a row the tweak's own disabled(scope) says can't act.
+-- and so is a row the tweak's own disabled(scope) or its scope's off() says
+-- can't act.
 function Bars.AddRows(def)
     local own = def.disabled
     for _, s in ipairs(Bars.SCOPES) do
@@ -55,7 +62,9 @@ function Bars.AddRows(def)
             if def.valuesOf then row.values, row.order = def.valuesOf(scope) end
             if scope ~= "all" then
                 local custom = "bars." .. scope .. ".custom"
-                row.disabled = function(get) return get(custom) ~= true or (own ~= nil and own(scope) == true) end
+                row.disabled = function(get)
+                    return get(custom) ~= true or scopeOff(scope) or (own ~= nil and own(scope) == true)
+                end
             elseif own then
                 row.disabled = function() return own(scope) == true end
             end

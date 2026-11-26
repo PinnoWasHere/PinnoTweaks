@@ -160,6 +160,18 @@ local function map(kind, frame, unit, isPreview)
 end
 Grad.Map = map
 
+-- A bar with no frame events (Swing.lua's swing bars): its own frame of one
+-- bar, mapped once.
+function Grad.MapBar(frame, kind, scope, bar)
+    frameKind[frame], frameScope[frame], powerScope[frame] = kind, scope, nil
+    frameUnit[frame], framePreview[frame] = false, false
+    frameBars[frame] = frameBars[frame] or {}
+    frameBars[frame][1] = bar
+    barScope[bar], barFrame[bar], barPart[bar] = scope, frame, "bar"
+    if Grad.ApplyFill then Grad.ApplyFill(bar) end
+    barDone(bar)
+end
+
 -- ---------------------------------------------------------------------
 -- Settings, read once per change
 -- ---------------------------------------------------------------------
@@ -203,7 +215,7 @@ end
 -- The rows
 -- ---------------------------------------------------------------------
 
-local KINDS = { "unit", "party", "raid", "partypet", "castbar", "platecast", "nameplate" }
+local KINDS = { "unit", "party", "raid", "partypet", "castbar", "platecast", "nameplate", "swing" }
 
 -- Color modes that paint a two-color gradient Daylight UI's painters lay.
 local GRAD_HEALTH = { classGradient = true, customGradient = true }
@@ -329,7 +341,8 @@ end
 local READS = {
     UnitFrames = function(path)
         return path == "colors.health" or path == "colors.power" or path == "casts.fill"
-            or path == "casts.spellColors" or path:find("%.colorHealth$") ~= nil or path:find("%.colorPower$") ~= nil
+            or path == "casts.spellColors" or path == "swing.fill" or path == "swing.enabled"
+            or path:find("%.colorHealth$") ~= nil or path:find("%.colorPower$") ~= nil
     end,
     Nameplates = function(path)
         return path == "healthColor" or path == "friendly.healthColor" or path == "power"
@@ -702,6 +715,9 @@ local function moduleNs(module)
     return mod and mod.ns
 end
 
+-- Other files' repaint for a kind of their own: kind -> fn(frame).
+Grad.REPAINT = {}
+
 -- Daylight UI paints the frame again. Many-color pieces come off first so they
 -- pin again in the new direction. A nameplate's cast bar takes the change on
 -- its next cast.
@@ -721,6 +737,8 @@ function Grad.Repaint(frame)
         elseif frame.unit then
             moduleNs("Nameplates").Plate.UpdateAll(frame)
         end
+    elseif Grad.REPAINT[kind] then
+        Grad.REPAINT[kind](frame)
     end
 end
 

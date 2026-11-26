@@ -19,7 +19,7 @@ local addonName, ns = ...
 -- internal used is checked at login; with one missing, nothing is installed.
 
 local API = DaylightUI.API
-local Bars, Grad, Fills = ns.Bars, ns.Gradients, ns.Fills
+local Bars, Grad, Fills, Tint = ns.Bars, ns.Gradients, ns.Fills, ns.Tint
 local me = API.For(addonName)
 
 local Health = { installed = false }
@@ -51,9 +51,8 @@ local DEMO_EVERY, DEMO_HIT = 2.5, 0.2
 local QUIET = API.Speed.SLOW
 -- Ghost opacity 100% is this alpha, so the bar's empty part always shows.
 local GHOST_MAX = 0.5
--- The white lift over a bar-colored ghost: Daylight UI's own lighten amount
--- (Colors.lua :332, Style.Lighten(..., 0.3)).
-local LIFT = 0.3
+-- The white lift over a bar-colored ghost.
+local LIFT = Tint.LIFT
 
 -- ---------------------------------------------------------------------
 -- Daylight UI internals
@@ -191,11 +190,6 @@ local function weak() return setmetatable({}, { __mode = "k" }) end
 local helperOf = weak()  -- bar -> our unseen status bar, laid on it
 local ghostOf = weak()   -- bar -> the ghost texture, on the bar under its fill
 local liftOf = weak()    -- bar -> the white ADD lift over its ghost
-local tintOf = weak()    -- bar -> its fill's last colors, passed through untouched
-local unitTint = weak()  -- bar -> the unit's own color from UF.PaintHealth
-local darkOf = weak()    -- bar -> true while its fill is Dark's near-black
-local sweepOf = weak()   -- bar -> true while it shows the Daylight sweep
-local fillToBar = weak() -- fill texture -> its bar, while the bar wears a ghost
 local lowOf = weak()     -- bar -> the breakpoint texture, over its fill
 local barOfHelper = weak() -- helper -> its bar
 local wearing = weak()   -- bar -> its resolved look while it wears a ghost
@@ -294,19 +288,8 @@ local function feedValue(bar, u, glide)
     if v then h:SetValue(v, how) end
 end
 
-local UF -- Daylight UI's unit frames table, set at login when the module is on
-
--- The way the fill's pair runs: the scope's own direction, else the
--- Gradients page's.
-local function orientationOf(bar)
-    local dir = Grad.Resolve(barScope[bar])
-    return dir or DaylightUI.Gradients.Orientation()
-end
-
--- The ghost's color: the picked one, or the bar's own, lifted by the white
--- layer over it. The bar's colors pass straight from Daylight UI's paint into
--- the ghost's setters, so a secret color is never read. Dark's near-black
--- gives way to the unit's own color; the Daylight sweep to its middle color.
+-- The ghost's color: the picked one, or the bar's own (Tint.lua), lifted by
+-- the white layer over it.
 local function paintGhost(bar)
     local c, g = wearing[bar], ghostOf[bar]
     if not c then return end
@@ -316,24 +299,7 @@ local function paintGhost(bar)
         g:SetVertexColor(k[1], k[2], k[3], a)
         return
     end
-    local t = tintOf[bar]
-    if darkOf[bar] and unitTint[bar] then t = unitTint[bar] end
-    if sweepOf[bar] then
-        local r, gg, b = Style.FlatSweep()
-        g:SetVertexColor(r, gg, b, a)
-    elseif t and t.two then
-        Style.Gradient(g, orientationOf(bar), t[1], t[2], t[3], a, t[4], t[5], t[6], a)
-    elseif t and t.set then
-        g:SetVertexColor(t[1], t[2], t[3], a)
-    else
-        local lo, hi = Style.FillColors(bar:GetStatusBarTexture())
-        if lo then
-            Style.Gradient(g, orientationOf(bar), lo[1], lo[2], lo[3], a, hi[1], hi[2], hi[3], a)
-        else
-            local k = GHOST_DEFAULT
-            g:SetVertexColor(k[1], k[2], k[3], a)
-        end
-    end
+    Tint.Paint(bar, g, a, GHOST_DEFAULT)
 end
 Health.PaintGhost = paintGhost
 
@@ -532,7 +498,7 @@ end
 local function ghostOn(bar, c)
     if not helperOf[bar] then makeHelper(bar) end
     wearing[bar] = c
-    fillToBar[bar:GetStatusBarTexture()] = bar
+    Tint.Follow(bar, GHOST)
     -- The opacity rides in the color too: a texture has one alpha, and a
     -- color set without one would put it back to 1.
     paintGhost(bar)
@@ -548,7 +514,7 @@ local function ghostOff(bar)
     if not wearing[bar] then return end
     wearing[bar], snapped[bar], demoAt[bar] = nil, nil, nil
     holdUntil[bar], drainUntil[bar], quietUntil[bar] = nil, nil, nil
-    fillToBar[bar:GetStatusBarTexture()] = nil
+    Tint.Unfollow(bar, GHOST)
     hideGhost(bar)
 end
 
@@ -687,89 +653,17 @@ local function afterAngle(bar)
     if c then layGhost(bar) end
 end
 
--- The bar's colors as Daylight UI paints them, kept for the ghost. Each may be
--- secret: they only go back into the ghost's setters.
-local function keep(bar)
-    local t = tintOf[bar]
-    if not t then
-        t = {}
-        tintOf[bar] = t
-    end
-    return t
-end
-
-local function unpackColor(c)
-    if type(c) ~= "table" then return nil end
-    if c.r ~= nil then return c.r, c.g, c.b end
-    return c[1], c[2], c[3]
-end
-
 -- While a drain fades the ghost, a new color waits for the next hit, so the
 -- fade isn't reset.
 local function repaint(bar)
     if not fading[bar] then paintGhost(bar) end
 end
-
--- Style.NoteFill: a pair, or one color, in painting order.
-local function afterNote(tex, lo, hi)
-    local bar = fillToBar[tex]
-    if not bar then return end
-    local t = keep(bar)
-    t[1], t[2], t[3] = unpackColor(lo)
-    t.two, t.set = hi ~= nil, true
-    if t.two then t[4], t[5], t[6] = unpackColor(hi) end
-    darkOf[bar] = nil
-    repaint(bar)
-end
-
--- Style.NoteFillRGB: one color. Dark's near-black (plain) keeps the color
--- the ghost had, or takes the unit's own (UF.PaintHealth).
-local function afterNoteRGB(tex, r, g, b)
-    local bar = fillToBar[tex]
-    if not bar then return end
-    local d = UF and UF.DARK_FILL
-    if d and not (secret(r) or secret(g) or secret(b)) and r == d[1] and g == d[2] and b == d[3] then
-        darkOf[bar] = true
-    else
-        local t = keep(bar)
-        t[1], t[2], t[3], t.two, t.set = r, g, b, false, true
-        darkOf[bar] = nil
-    end
-    repaint(bar)
-end
-
--- Style.SetBarGradient: the Daylight sweep on or off.
-local function afterSweep(bar, on)
-    if not wearing[bar] then return end
-    sweepOf[bar] = (on and not DaylightUI.Gradients.Flat()) or nil
-    repaint(bar)
-end
-
--- UF.PaintHealth: r, g, b is the unit's own color, which Dark's ghost takes.
-local function afterHealth(f, r, g, b)
-    local bars = frameBars[f]
-    if not bars then return end
-    for i = 1, #bars do
-        local bar = bars[i]
-        if wearing[bar] and barPart[bar] == "health" then
-            local t = unitTint[bar]
-            if not t then
-                t = {}
-                unitTint[bar] = t
-            end
-            t[1], t[2], t[3], t.set = r, g, b, true
-            repaint(bar)
-        end
-    end
-end
+Tint.OnChange(GHOST, repaint)
 
 -- { owner, name, fn, module? }. Hooks of a module that is off are skipped.
+-- The bar's colors come through Tint.lua's hooks.
 local HOOKS = {
     { "Style", "AngleFill", afterAngle },
-    { "Style", "NoteFill", afterNote },
-    { "Style", "NoteFillRGB", afterNoteRGB },
-    { "Style", "SetBarGradient", afterSweep },
-    { "UF", "PaintHealth", afterHealth, "UnitFrames" },
 }
 Health.HOOKS = HOOKS
 local hookTables = {} -- owner name -> Daylight UI's table, set at login
@@ -861,14 +755,17 @@ local function anyLook()
     return ghost, low
 end
 
--- The hook is on while some scope wears a ghost; the events while some scope
+-- The hooks are on while some scope wears a ghost; the events while some scope
 -- wears either look.
 function Health.Sync()
     if not Health.installed then return end
     local ghost, low = anyLook()
+    local tinted, refused = Tint.Need(GHOST, ghost)
     if ghost and #handles == 0 then
-        local ok, name = hookAll()
+        local ok, name = tinted, refused
+        if ok then ok, name = hookAll() end
         if not ok then
+            Tint.Need(GHOST, false)
             Health.installed = false
             Health.broken = { name }
             listen(false, false)
@@ -1004,6 +901,7 @@ end)
 function Health.Start()
     if Health.installed or Health.broken then return end
     local missing = Grad.installed and Health.Missing() or { "Gradients.lua's frame map" }
+    if #missing == 0 and not Tint.installed then missing = Tint.Missing() end
     if #missing > 0 then
         Health.broken = missing
         DEFAULT_CHAT_FRAME:AddMessage(addonName .. ": frame health effects are off. Daylight UI no longer has "
@@ -1012,7 +910,6 @@ function Health.Start()
     end
     Style = DaylightUI.Style
     for _, e in ipairs(Health.INTERNALS) do hookTables[e[1]] = e[3]() end
-    UF = hookTables.UF
     EASE = Enum.StatusBarInterpolation and Enum.StatusBarInterpolation.ExponentialEaseOut
     Health.installed = true
     me.On("FrameUnitChanged", unitChanged)
