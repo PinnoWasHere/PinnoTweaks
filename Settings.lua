@@ -81,10 +81,12 @@ function Bars.Get(scope, tweak)
     return setting("bars.all." .. tweak)
 end
 
--- Does a tweak apply to a scope? All frames takes every tweak.
+-- Does a tweak apply to a scope? All frames takes every tweak. A tweak's
+-- only(scope) can leave a scope out.
 function Bars.Applies(def, scope)
     local s = Bars.SCOPE[scope]
     if not s then return false end
+    if def.only and not def.only(scope) then return false end
     if not s.kinds then return true end
     for _, kind in ipairs(s.kinds) do
         for _, k in ipairs(def.kinds) do
@@ -101,8 +103,9 @@ end
 local ROW_TYPES = { toggle = true, dropdown = true, slider = true, color = true }
 
 -- def: { key, label, desc?, type, default, kinds, values?, order?, min?, max?,
--- step?, unit?, disabled?, valuesOf? }. disabled(scope) dims the scope's row
--- while true. valuesOf(scope) gives a dropdown's values and order per scope.
+-- step?, unit?, disabled?, valuesOf?, only? }. disabled(scope) dims the scope's
+-- row while true. valuesOf(scope) gives a dropdown's values and order per scope.
+-- only(scope) false leaves the scope without the tweak.
 -- Registers before login only, while the defaults and the page are still open.
 -- Returns true, or false and why.
 function Bars.AddTweak(def)
@@ -115,6 +118,7 @@ function Bars.AddTweak(def)
     if type(def.kinds) ~= "table" or #def.kinds == 0 then return false, "no kinds" end
     if def.disabled ~= nil and type(def.disabled) ~= "function" then return false, "disabled is not a function" end
     if def.valuesOf ~= nil and type(def.valuesOf) ~= "function" then return false, "valuesOf is not a function" end
+    if def.only ~= nil and type(def.only) ~= "function" then return false, "only is not a function" end
     Bars.tweaks[#Bars.tweaks + 1] = def
     Bars.byKey[def.key] = def
     for _, s in ipairs(Bars.SCOPES) do

@@ -520,7 +520,7 @@ Grad.overlay, Grad.sweepOf = overlay, sweepOf
 local function overlayOf(bar)
     local t = overlay[bar]
     if not t then
-        t = bar:CreateTexture(nil, "ARTWORK", nil, 1)
+        t = bar:CreateTexture(nil, "ARTWORK", nil, 4)
         t:SetBlendMode("MOD")
         Style.FollowFill(bar, t)
         t:Hide()

@@ -14,3 +14,4 @@ Settings.lua
 BarsPage.lua
 Gradients.lua
 Fills.lua
+Health.lua

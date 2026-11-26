@@ -796,13 +796,15 @@ Bars.AddTweak({
     key = LIGHT, label = "Light amount", type = "slider", default = 0.3, kinds = KINDS,
     min = 0, max = 1, step = 0.05, unit = "%",
     desc = "How far Light lifts the fill.",
-    disabled = function(scope) return not Fills.installed or Fills.Resolve(scope).look ~= "light" end,
+    disabled = function(scope) return not Fills.installed or Bars.Get(scope, LOOK) ~= "light" end,
 })
 
 -- The background rows are for health and power bars.
 local BACK_KINDS = { "unit", "party", "raid", "partypet", "nameplate" }
 
-local function stateOff(scope) return not Fills.installed or not Fills.Resolve(scope).state end
+-- Rows read the settings live: Daylight UI redraws the page before the cache
+-- hears a change.
+local function stateOff(scope) return not Fills.installed or Bars.Get(scope, STATE) ~= true end
 
 Bars.AddTweak({
     key = BACK, label = "Bar background color", type = "dropdown", default = "daylight", kinds = BACK_KINDS,
