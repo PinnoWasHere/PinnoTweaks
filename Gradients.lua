@@ -88,7 +88,7 @@ local UNIT_SCOPE = { player = "player", target = "target", focus = "focus", pet 
 local CAST_SCOPE = { player = "castbar", target = "targetcast", focus = "focuscast" }
 
 -- A frame's scope on the Frames page. A frame with no scope of its own (the
--- target's target, a party member's cast bar) follows All frames.
+-- target's target, a party member's cast bar) follows Look.
 function Grad.ScopeOf(kind, unit)
     local s = KIND_SCOPE[kind]
     if s then return s end
@@ -103,7 +103,7 @@ function Grad.ScopeOf(kind, unit)
 end
 
 -- A power bar's scope, from its frame's. Frames with no scope of their own
--- follow All frames for both bars.
+-- follow Look for both bars.
 local POWER_SCOPE = { player = "playerpower", target = "targetpower", focus = "focuspower", pet = "petpower",
     party = "partypower", raid = "raidpower", arena = "arenapower", nameplate = "platepower", all = "all" }
 Grad.POWER_SCOPE = POWER_SCOPE
@@ -283,12 +283,12 @@ local HAS_GRADIENT = {
 }
 Grad.HAS_GRADIENT = HAS_GRADIENT
 
--- All frames reaches every scope that follows it, and the frames with no scope.
+-- Look reaches every scope that follows it, and the frames with no scope.
 local function hasGradient(scope)
     if scope ~= "all" then return HAS_GRADIENT[scope]() end
     if healthGradient("targettarget") or powerGradient(nil) or castGradient(false) then return true end
     for key, fn in pairs(HAS_GRADIENT) do
-        if not Bars.Custom(key) and fn() then return true end
+        if not Bars.Custom(key, "gradient") and fn() then return true end
     end
     return false
 end
@@ -305,17 +305,16 @@ end
 -- Workaround for a Daylight UI bug (docs/reference/core-prs.md): in game, a
 -- row dimmed by disabled() shows at full alpha until the page refreshes again,
 -- after its first show or after a color mode changes on another page. So the
--- Frames page refreshes itself a frame and 0.3 s after it shows, and once
+-- page of ours refreshes itself a frame and 0.3 s after it shows, and once
 -- (debounced) after a setting its rows read changes while it is open. Remove
 -- once Daylight UI redraws them itself.
 
-local PAGE_ID = Bars.MODULE .. "." .. Bars.PAGE.id
-Grad.PAGE_ID = PAGE_ID
+Grad.PAGE_ID = Bars.MODULE .. "." .. Bars.PAGE.id
 local redrawQueued = false
 
 local function ourPage()
     local panel = DaylightUI.OptionsPanel
-    return panel.IsShown() and panel.Current() == PAGE_ID
+    return panel.IsShown() and Bars.PAGE_IDS[panel.Current()] == true
 end
 
 local function redraw()
@@ -332,7 +331,7 @@ function Grad.RedrawSoon()
 end
 
 local function pageShown(id)
-    if id ~= PAGE_ID then return end
+    if not Bars.PAGE_IDS[id] then return end
     C_Timer.After(0, redraw)
     C_Timer.After(0.3, redraw)
 end
@@ -359,7 +358,7 @@ end
 local OFF_HINT = " Off while the frame's bar colors have no gradient (class, one color, dark, By health, the Daylight gradient) or Gradients is off."
 
 Bars.AddTweak({
-    key = DIR, label = "Gradient direction", type = "dropdown", default = "daylight", kinds = KINDS,
+    key = DIR, card = "gradient", label = "Gradient direction", type = "dropdown", default = "daylight", kinds = KINDS,
     values = { daylight = "Daylight UI's", HORIZONTAL = "Horizontal", VERTICAL = "Vertical" },
     order = { "daylight", "HORIZONTAL", "VERTICAL" },
     desc = "Which way the color runs along the bar. Daylight UI's follows its Gradients page. Horizontal or Vertical turns this frame's bar effects (Flow, Tide) off while set." .. OFF_HINT,
@@ -367,13 +366,13 @@ Bars.AddTweak({
 })
 
 Bars.AddTweak({
-    key = FLIP, label = "Flip gradient", type = "toggle", default = false, kinds = KINDS,
+    key = FLIP, card = "gradient", label = "Flip gradient", type = "toggle", default = false, kinds = KINDS,
     desc = "Runs the colors the other way. The target's mirroring still applies." .. OFF_HINT,
     disabled = Grad.Off,
 })
 
 Bars.AddTweak({
-    key = FILL, label = "Fill texture", type = "dropdown", default = "daylight", kinds = KINDS,
+    key = FILL, card = "fill", label = "Fill texture", type = "dropdown", default = "daylight", kinds = KINDS,
     values = { daylight = "Daylight UI's", diagonal = "Diagonal", radial = "Radial" },
     order = { "daylight", "diagonal", "radial" },
     desc = "A light-to-dark shape laid over the bar's own texture and colors. Diagonal and Radial turn this frame's bar effects (Flow, Tide) off while on. The Daylight gradient keeps its own look.",
@@ -577,7 +576,7 @@ end
 -- and only horizontal (Daylight UI turns them off on an upright bar). So a
 -- custom direction or a fill texture turns its frames' effects to none with
 -- me.Override, and gives them back when it's off.
--- Each is { module, setting path }; All frames' list covers frames with no
+-- Each is { module, setting path }; Look's list covers frames with no
 -- scope of their own.
 -- bar is "health" or "power"; each key a UnitFrames frame page.
 local function fxList(bar, ...)
@@ -747,7 +746,7 @@ local changeListeners = {}
 function Grad.BeforeRepaint(fn) changeListeners[#changeListeners + 1] = fn end
 
 -- Repaints every frame a scope's change reaches, and puts on or takes off its
--- fill texture and the bar effect overrides. All frames' reaches each frame
+-- fill texture and the bar effect overrides. Look's reaches each frame
 -- that follows it.
 Bars.OnChanged(function(scope)
     forget()

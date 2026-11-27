@@ -808,81 +808,81 @@ local function lowRowsOff(scope) return not Health.installed or Bars.Get(scope, 
 local function healthScope(scope) return not POWER[scope] end
 
 Bars.AddTweak({
-    key = GHOST, label = "Cutaway ghost", type = "toggle", default = false, kinds = KINDS,
+    key = GHOST, card = "ghost", label = "Cutaway ghost", type = "toggle", default = false, kinds = KINDS,
     desc = "After a hit, the health or power just lost stays on the bar as a ghost for a moment, then drains away. A heal shows none. Off while this frame's Fill opacity is below 75%: the ghost lies under the fill.",
     disabled = function(scope) return off() or faded(scope) end,
 })
 
 Bars.AddTweak({
-    key = GHOST_MODE, label = "Ghost color", type = "dropdown", default = "bar", kinds = KINDS,
+    key = GHOST_MODE, card = "ghost", label = "Ghost color", type = "dropdown", default = "bar", kinds = KINDS,
     values = { bar = "Bar color", custom = "Custom" }, order = { "bar", "custom" },
     desc = "Bar color is a paler copy of the bar's own colors. Custom uses the color below.",
     disabled = ghostRowsOff,
 })
 
 Bars.AddTweak({
-    key = GHOST_COLOR, label = "Custom ghost color", type = "color", default = GHOST_DEFAULT, kinds = KINDS,
+    key = GHOST_COLOR, card = "ghost", label = "Custom ghost color", type = "color", default = GHOST_DEFAULT, kinds = KINDS,
     desc = "The ghost's color when Ghost color is Custom.",
     disabled = function(scope) return ghostRowsOff(scope) or Bars.Get(scope, GHOST_MODE) ~= "custom" end,
 })
 
 Bars.AddTweak({
-    key = GHOST_ALPHA_KEY, label = "Ghost opacity", type = "slider", default = GHOST_ALPHA, kinds = KINDS,
+    key = GHOST_ALPHA_KEY, card = "ghost", label = "Ghost opacity", type = "slider", default = GHOST_ALPHA, kinds = KINDS,
     min = 0.05, max = 1, step = 0.05, unit = "%",
     desc = "How solid the ghost is. Even at 100% the bar's empty part shows through it.",
     disabled = ghostRowsOff,
 })
 
 Bars.AddTweak({
-    key = DRAIN, label = "Ghost drain", type = "dropdown", default = "glide", kinds = KINDS,
+    key = DRAIN, card = "ghost", label = "Ghost drain", type = "dropdown", default = "glide", kinds = KINDS,
     values = { glide = "Glide", fade = "Fade", both = "Glide and fade" }, order = { "glide", "fade", "both" },
     desc = "How the ghost goes: it glides down to the bar's value, fades out, or both. With Daylight UI's motion effects off it goes at once.",
     disabled = ghostRowsOff,
 })
 
 Bars.AddTweak({
-    key = HOLD, label = "Ghost delay", type = "slider", default = 0.8, kinds = KINDS,
+    key = HOLD, card = "ghost", label = "Ghost delay", type = "slider", default = 0.8, kinds = KINDS,
     min = 0.2, max = 3, step = 0.1, unit = "s",
     desc = "How long the ghost waits before it drains. Each new hit starts the wait again where the game reports hits.",
     disabled = ghostRowsOff,
 })
 
 Bars.AddTweak({
-    key = FADE, label = "Ghost fade time", type = "slider", default = API.Speed.SLOW, kinds = KINDS,
+    key = FADE, card = "ghost", label = "Ghost fade time", type = "slider", default = API.Speed.SLOW, kinds = KINDS,
     min = 0.1, max = 2, step = 0.05, unit = "s",
     desc = "How long Fade takes.",
     disabled = function(scope) return ghostRowsOff(scope) or noFade(scope) end,
 })
 
 Bars.AddTweak({
-    key = LOW, label = "Low health color", type = "toggle", default = false, kinds = KINDS, only = healthScope,
+    key = LOW, card = "low", label = "Low health color", type = "toggle", default = false, kinds = KINDS, only = healthScope,
     desc = "Below a health threshold the bar turns the color below, over every color mode, Dark included. Above it the bar's own colors return.",
     disabled = off,
 })
 
 Bars.AddTweak({
-    key = LOW_AT, label = "Low health below", type = "slider", default = 0.35, kinds = KINDS, only = healthScope,
+    key = LOW_AT, card = "low", label = "Low health below", type = "slider", default = 0.35, kinds = KINDS, only = healthScope,
     min = 0.05, max = 0.95, step = 0.05, unit = "%",
     desc = "The health the color takes over below.",
     disabled = lowRowsOff,
 })
 
 Bars.AddTweak({
-    key = LOW_COLOR, label = "Low health bar color", type = "color", default = LOW_DEFAULT, kinds = KINDS,
+    key = LOW_COLOR, card = "low", label = "Low health bar color", type = "color", default = LOW_DEFAULT, kinds = KINDS,
     only = healthScope,
     desc = "The color the bar turns.",
     disabled = lowRowsOff,
 })
 
 Bars.AddTweak({
-    key = SHADE, label = "Low health shading", type = "dropdown", default = "flat", kinds = KINDS, only = healthScope,
+    key = SHADE, card = "low", label = "Low health shading", type = "dropdown", default = "flat", kinds = KINDS, only = healthScope,
     values = { flat = "Flat", two = "Two-shade" }, order = { "flat", "two" },
     desc = "Flat is one color. Two-shade runs from a softer shade of it to the color, the way the frame's gradient runs.",
     disabled = lowRowsOff,
 })
 
 Bars.AddTweak({
-    key = FRIENDLY, label = "Friendly only", type = "toggle", default = false, kinds = KINDS, only = healthScope,
+    key = FRIENDLY, card = "low", label = "Friendly only", type = "toggle", default = false, kinds = KINDS, only = healthScope,
     desc = "Only friendly units' bars change color.",
     disabled = lowRowsOff,
 })

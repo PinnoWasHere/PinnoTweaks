@@ -745,10 +745,10 @@ function Fills.Listening() return listening end
 
 local KINDS = { "unit", "party", "raid", "partypet", "castbar", "platecast", "nameplate", "swing" }
 
--- Does a bar of the scope (or one following All frames) wear three or more colors?
+-- Does a bar of the scope (or one following Look) wear three or more colors?
 local function manyColors(scope)
     for bar, s in pairs(barScope) do
-        if s == scope or (scope == "all" and not Bars.Custom(s)) then
+        if s == scope or (scope == "all" and not Bars.Custom(s, "fill")) then
             local fill = bar:GetStatusBarTexture()
             if fill and Style.FillStops(fill) then return true end
         end
@@ -761,14 +761,14 @@ function Fills.OpacityOff(scope)
 end
 
 Bars.AddTweak({
-    key = OPACITY, label = "Fill opacity", type = "slider", default = 1, kinds = KINDS,
+    key = OPACITY, card = "fill", label = "Fill opacity", type = "slider", default = 1, kinds = KINDS,
     min = 0, max = 1, step = 0.05, unit = "%",
     desc = "How solid the bar's fill is. Below 100% the background shows through it, and this frame's bar effects (Flow, Tide) turn off. Off while the bar wears three or more colors: those draw at full strength whatever the opacity.",
     disabled = Fills.OpacityOff,
 })
 
 -- Dark is offered where Daylight UI has none of its own: power, nameplate,
--- cast and swing bars, and All frames (which reaches them).
+-- cast and swing bars, and Look (which reaches them).
 local DARK_SCOPES = { all = true, castbar = true, targetcast = true, focuscast = true, platecast = true,
     nameplate = true }
 for _, swing in pairs(ns.SwingBars.SCOPE) do DARK_SCOPES[swing] = true end
@@ -783,7 +783,7 @@ local LIGHT_VALUES = { daylight = LOOK_VALUES.daylight, light = LOOK_VALUES.ligh
 local LIGHT_ORDER = { "daylight", "light" }
 
 Bars.AddTweak({
-    key = LOOK, label = "Fill look", type = "dropdown", default = "daylight", kinds = KINDS,
+    key = LOOK, card = "fill", label = "Fill look", type = "dropdown", default = "daylight", kinds = KINDS,
     values = LOOK_VALUES, order = LOOK_ORDER,
     valuesOf = function(scope)
         if DARK_SCOPES[scope] then return LOOK_VALUES, LOOK_ORDER end
@@ -794,7 +794,7 @@ Bars.AddTweak({
 })
 
 Bars.AddTweak({
-    key = LIGHT, label = "Light amount", type = "slider", default = 0.3, kinds = KINDS,
+    key = LIGHT, card = "fill", label = "Light amount", type = "slider", default = 0.3, kinds = KINDS,
     min = 0, max = 1, step = 0.05, unit = "%",
     desc = "How far Light lifts the fill.",
     disabled = function(scope) return not Fills.installed or Bars.Get(scope, LOOK) ~= "light" end,
@@ -808,7 +808,7 @@ local BACK_KINDS = { "unit", "party", "raid", "partypet", "nameplate" }
 local function stateOff(scope) return not Fills.installed or Bars.Get(scope, STATE) ~= true end
 
 Bars.AddTweak({
-    key = BACK, label = "Bar background color", type = "dropdown", default = "daylight", kinds = BACK_KINDS,
+    key = BACK, card = "background", label = "Bar background color", type = "dropdown", default = "daylight", kinds = BACK_KINDS,
     values = { daylight = "Daylight UI's", value = "By value", class = "By class" },
     order = { "daylight", "value", "class" },
     desc = "The color of the bar's empty part. By value runs green to red with the bar's health or power. By class uses a player's class color; NPCs keep Daylight UI's.",
@@ -816,19 +816,19 @@ Bars.AddTweak({
 })
 
 Bars.AddTweak({
-    key = STATE, label = "Dead and offline backgrounds", type = "toggle", default = false, kinds = BACK_KINDS,
+    key = STATE, card = "background", label = "Dead and offline backgrounds", type = "toggle", default = false, kinds = BACK_KINDS,
     desc = "A dead or offline player's bars get the background colors below.",
     disabled = function() return not Fills.installed end,
 })
 
 Bars.AddTweak({
-    key = DEAD, label = "Dead background", type = "color", default = DEAD_COLOR, kinds = BACK_KINDS,
+    key = DEAD, card = "background", label = "Dead background", type = "color", default = DEAD_COLOR, kinds = BACK_KINDS,
     desc = "The empty part's color while a player is dead or a ghost.",
     disabled = stateOff,
 })
 
 Bars.AddTweak({
-    key = OFFLINE, label = "Offline background", type = "color", default = OFFLINE_COLOR, kinds = BACK_KINDS,
+    key = OFFLINE, card = "background", label = "Offline background", type = "color", default = OFFLINE_COLOR, kinds = BACK_KINDS,
     desc = "The empty part's color while a player is offline.",
     disabled = stateOff,
 })

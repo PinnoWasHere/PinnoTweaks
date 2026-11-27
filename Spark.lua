@@ -464,7 +464,7 @@ local function listen(parts)
     end
 end
 
--- The bar parts a scope's spark reaches. All frames reaches every part. Swing
+-- The bar parts a scope's spark reaches. Look reaches every part. Swing
 -- bars have no events (the driver), so "swing" has none.
 local CAST_SCOPES = { castbar = true, targetcast = true, focuscast = true, platecast = true }
 local SWING_SCOPES = {}
@@ -530,20 +530,20 @@ local function off() return not Spark.installed end
 local function rowsOff(scope) return not Spark.installed or Bars.Get(scope, SPARK) ~= true end
 
 Bars.AddTweak({
-    key = SPARK, label = "Spark", type = "toggle", default = false, kinds = KINDS,
+    key = SPARK, card = "spark", label = "Spark", type = "toggle", default = false, kinds = KINDS,
     desc = "A soft light rides the end of the fill. It hides when the bar is full or empty, and on a cast bar between casts. Daylight UI's Comet bar effect lights the same end, so the two add up.",
     disabled = off,
 })
 
 Bars.AddTweak({
-    key = MODE, label = "Spark color", type = "dropdown", default = "bar", kinds = KINDS,
+    key = MODE, card = "spark", label = "Spark color", type = "dropdown", default = "bar", kinds = KINDS,
     values = { bar = "Bar color", custom = "Custom" }, order = { "bar", "custom" },
     desc = "Bar color is a paler copy of the bar's own color at the fill's end. Custom uses the color below.",
     disabled = rowsOff,
 })
 
 Bars.AddTweak({
-    key = COLOR, label = "Custom spark color", type = "color", default = COLOR_DEFAULT, kinds = KINDS,
+    key = COLOR, card = "spark", label = "Custom spark color", type = "color", default = COLOR_DEFAULT, kinds = KINDS,
     desc = "The spark's color when Spark color is Custom.",
     disabled = function(scope) return rowsOff(scope) or Bars.Get(scope, MODE) ~= "custom" end,
 })

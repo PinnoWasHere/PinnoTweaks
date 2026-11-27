@@ -5,7 +5,7 @@
 ## Version: 0.0.1
 ## X-License: All Rights Reserved
 ## Dependencies: DaylightUI
-## OptionalDeps: DaylightUI_ActionBars
+## OptionalDeps: DaylightUI_ActionBars, DaylightUI_UnitFrames
 ## Category: DaylightUI Plugins
 ## Group: PinnoTweaks
 ## SavedVariables: PinnoTweaksDB
@@ -13,10 +13,12 @@
 PinnoTweaks.lua
 Settings.lua
 BarsPage.lua
+BarsSample.lua
 Gradients.lua
 Swing.lua
 Fills.lua
 Tint.lua
 Health.lua
 Spark.lua
+Prediction.lua
 ManaCost.lua
