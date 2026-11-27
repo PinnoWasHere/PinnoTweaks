@@ -4,3 +4,7 @@ package-as: PinnoTweaks
 # repo itself. Files and folders starting with a dot never package.
 ignore:
   - README.md
+
+manual-changelog:
+  filename: CHANGELOG.md
+  markup-type: markdown
