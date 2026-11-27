@@ -2,8 +2,8 @@ name: Release
 
 # ship.method nested: this workflow lives in the public addon repo, which holds no tests.
 # The full LuaJIT suite runs in the private project before the tag (skill release).
-# Packaging rules live in .pkgmeta. Remove -d from args to upload; upload needs the
-# CF_API_KEY / WAGO_API_TOKEN / GITHUB_OAUTH secrets and the project IDs in the toc.
+# Packaging rules live in .pkgmeta. A tag uploads to CurseForge (CF_API_KEY, the toc's
+# X-Curse-Project-ID) and to a GitHub release.
 
 on:
   push:
@@ -25,7 +25,10 @@ jobs:
       - name: Package
         uses: BigWigsMods/packager@v2
         with:
-          args: -d -n "{package-name}-{project-version}"
+          args: -n "{package-name}-{project-version}"
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_KEY }}
+          GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Keep the zip
         uses: actions/upload-artifact@v4
