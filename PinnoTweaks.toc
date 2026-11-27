@@ -4,6 +4,7 @@
 ## Author: PinnoWasHere
 ## Version: 0.1.0
 ## X-License: All Rights Reserved
+## X-Curse-Project-ID: 1835025
 ## Dependencies: DaylightUI
 ## OptionalDeps: DaylightUI_ActionBars, DaylightUI_UnitFrames
 ## Category: DaylightUI Plugins
