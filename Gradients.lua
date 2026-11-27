@@ -121,6 +121,14 @@ Grad.barScope, Grad.frameScope, Grad.powerScope = barScope, frameScope, powerSco
 Grad.frameBars, Grad.barFrame, Grad.barPart = frameBars, barFrame, barPart
 Grad.frameUnit, Grad.framePreview, Grad.frameKind = frameUnit, framePreview, frameKind
 
+-- A sample frame shows Daylight UI's numbers, not a unit's: a preview frame (the
+-- party and raid samples, the options preview), or a real frame that test mode
+-- has handed a sample (f.test: target, focus, pet, arena).
+function Grad.IsSample(frame)
+    if not frame then return false end
+    return framePreview[frame] == true or type(frame.test) == "table"
+end
+
 -- Other files' fn(bar). Each runs after a bar is mapped and after each
 -- repaint a setting change makes.
 local barListeners = {}

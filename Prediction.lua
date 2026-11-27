@@ -225,7 +225,7 @@ end
 -- A real unit's bar, or nil for a sample frame or a frame with no unit now.
 local function unitOf(bar)
     local frame = barFrame[bar]
-    if framePreview[frame] or sampleOf(frame) then return nil end
+    if Grad.IsSample(frame) then return nil end
     return frameUnit[frame] or nil
 end
 

@@ -133,11 +133,12 @@ local function listens(c) return c.back == "value" or c.state end
 local Style, UF, Health -- Daylight UI's Style, unit frames and health colors, set at login
 local barScope, barFrame, barPart = Grad.barScope, Grad.barFrame, Grad.barPart
 local frameBars, frameKind = Grad.frameBars, Grad.frameKind
-local frameUnit, framePreview = Grad.frameUnit, Grad.framePreview
+local frameUnit = Grad.frameUnit
 
 local fillBar = setmetatable({}, { __mode = "k" })  -- fill texture -> its bar
 local fadedTo = setmetatable({}, { __mode = "k" })  -- bar -> the alpha its fill was last given, while below 1
 local layersOf = setmetatable({}, { __mode = "k" }) -- bar -> its hidden-class layers
+local layerLook = setmetatable({}, { __mode = "k" }) -- layers -> { mode, flip } of their last paint
 local grainOf = setmetatable({}, { __mode = "k" })  -- bar -> Daylight UI's MOD grain over its fill
 local grainOn = setmetatable({}, { __mode = "k" })  -- bar -> whether Daylight UI wants that grain shown
 local lightOf = setmetatable({}, { __mode = "k" })  -- bar -> our light layer over its fill
@@ -151,7 +152,7 @@ local byUnit = {} -- unit -> { [frame] = true }
 local filed = setmetatable({}, { __mode = "k" }) -- frame -> the unit it is filed under
 
 local function file(frame)
-    local u = not framePreview[frame] and frameUnit[frame] or nil
+    local u = not Grad.IsSample(frame) and frameUnit[frame] or nil
     local was = filed[frame]
     if was == u then return end
     if was and byUnit[was] then byUnit[was][frame] = nil end
@@ -223,12 +224,25 @@ local function backBright(bar)
     return Style.BAR_BACK_DIM
 end
 
+-- A layer wearing a gradient drops SetAlpha, so Class gradient paints its pair
+-- again at alpha a, as Daylight UI does (Gradients.PaintClassLayers).
 local function fadeLayers(bar, a, dark)
     local layers = layersOf[bar]
     if not layers then return end
-    for _, tex in pairs(layers) do
+    local how = layerLook[layers]
+    for token, tex in pairs(layers) do
         if tex:IsShown() then
-            if dark then tex:Hide() else tex:SetAlpha(a) end
+            local lo, hi
+            if not dark and how and how.mode == "classGradient" then
+                lo, hi = DaylightUI.Gradients.Colors(token, how.flip)
+            end
+            if dark then
+                tex:Hide()
+            elseif lo and hi then
+                Style.Gradient(tex, DaylightUI.Gradients.Orientation(), lo.r, lo.g, lo.b, a, hi.r, hi.g, hi.b, a)
+            else
+                tex:SetAlpha(a)
+            end
         end
     end
 end
@@ -284,7 +298,7 @@ local function secret(v) return issecretvalue ~= nil and issecretvalue(v) == tru
 -- A real unit's bar (a sample frame has none of its own).
 local function unitOf(bar)
     local frame = barFrame[bar]
-    if framePreview[frame] then return nil end
+    if Grad.IsSample(frame) then return nil end
     return frameUnit[frame] or nil
 end
 
@@ -599,8 +613,9 @@ local function afterHealth(f, r, g, b, pct)
 end
 
 -- Gradients.PaintClassLayers: a hidden class's layers over the fill.
-local function afterLayers(layers)
+local function afterLayers(layers, _, mode, flip)
     if type(layers) ~= "table" then return end
+    layerLook[layers] = { mode = mode, flip = flip }
     local _, any = next(layers)
     local bar = any and any:GetParent()
     if not (bar and barScope[bar]) then return end

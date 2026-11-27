@@ -106,7 +106,7 @@ end
 
 local Style -- Daylight UI's Style, set at login
 local barScope, barFrame, barPart = Grad.barScope, Grad.barFrame, Grad.barPart
-local frameUnit, framePreview, frameKind = Grad.frameUnit, Grad.framePreview, Grad.frameKind
+local frameUnit, frameKind = Grad.frameUnit, Grad.frameKind
 
 local function weak() return setmetatable({}, { __mode = "k" }) end
 local sparkOf = weak() -- bar -> the spark texture
@@ -140,7 +140,7 @@ local function secret(v) return issecretvalue ~= nil and issecretvalue(v) == tru
 -- A real unit's bar, or nil for a sample frame or a frame with no unit now.
 local function unitOf(bar)
     local frame = barFrame[bar]
-    if framePreview[frame] then return nil end
+    if Grad.IsSample(frame) then return nil end
     return frameUnit[frame] or nil
 end
 
@@ -288,7 +288,7 @@ local function alphas(bar, c)
     end
     local v, lo, hi
     local f = barFrame[bar]
-    if framePreview[f] or frameKind[f] == "swing" then v, lo, hi = sample(bar) end
+    if Grad.IsSample(f) or frameKind[f] == "swing" then v, lo, hi = sample(bar) end
     if not (v and v > lo and v < hi) then return nil end
     return 1, lifted and LIFT or nil
 end
@@ -377,7 +377,9 @@ local function apply(bar)
     local c = Spark.Resolve(scope)
     if c.on then sparkOn(bar, c) else sparkOff(bar) end
     file(bar, c.on and unitOf(bar) or nil)
-    if frameKind[barFrame[bar]] == "swing" then tick(bar, c.on) end
+    -- Swing bars and samples send no event, so the driver watches their values.
+    local frame = barFrame[bar]
+    tick(bar, c.on and (frameKind[frame] == "swing" or Grad.IsSample(frame)))
 end
 Spark.Apply = apply
 Grad.OnBar(apply)
@@ -582,5 +584,14 @@ function Spark.Start()
         if Spark.Resolve(scope).on or (p and Spark.Resolve(p).on) then Grad.Repaint(frame) end
     end
 end
+
+-- Test mode hands frames a sample or takes it back in its own handler, so the
+-- bars look again once that has run.
+me.On("TestModeChanged", function()
+    C_Timer.After(0, function()
+        if not Spark.installed then return end
+        for bar in pairs(barScope) do apply(bar) end
+    end)
+end)
 
 me.On("Login", Spark.Start)

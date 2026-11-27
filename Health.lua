@@ -184,13 +184,14 @@ end
 
 local Style -- Daylight UI's Style, set at login
 local barScope, barFrame, barPart = Grad.barScope, Grad.barFrame, Grad.barPart
-local frameBars, frameUnit, framePreview = Grad.frameBars, Grad.frameUnit, Grad.framePreview
+local frameBars, frameUnit = Grad.frameBars, Grad.frameUnit
 
 local function weak() return setmetatable({}, { __mode = "k" }) end
 local helperOf = weak()  -- bar -> our unseen status bar, laid on it
 local ghostOf = weak()   -- bar -> the ghost texture, on the bar under its fill
 local liftOf = weak()    -- bar -> the white ADD lift over its ghost
 local lowOf = weak()     -- bar -> the breakpoint texture, over its fill
+local lowFrameOf = weak() -- bar -> the breakpoint's frame, which carries its alpha
 local barOfHelper = weak() -- helper -> its bar
 local wearing = weak()   -- bar -> its resolved look while it wears a ghost
 local lowOn = weak()     -- bar -> its resolved look while it wears a breakpoint
@@ -201,6 +202,7 @@ local fading = weak()    -- bar -> true once API.Fade has run on its ghost
 local quietUntil = weak() -- bar -> when its arrive window ends
 local demoAt = weak()    -- preview bar -> when its next demo hit is
 Health.helperOf, Health.ghostOf, Health.lowOf, Health.liftOf = helperOf, ghostOf, lowOf, liftOf
+Health.lowFrameOf = lowFrameOf
 Health.holdUntil, Health.drainUntil, Health.demoAt = holdUntil, drainUntil, demoAt
 
 function Health.Wears(bar) return wearing[bar] ~= nil end
@@ -229,11 +231,11 @@ local function secret(v) return issecretvalue ~= nil and issecretvalue(v) == tru
 -- A real unit's bar, or nil for a sample frame or a frame with no unit now.
 local function unitOf(bar)
     local frame = barFrame[bar]
-    if framePreview[frame] then return nil end
+    if Grad.IsSample(frame) then return nil end
     return frameUnit[frame] or nil
 end
 
-local function isPreview(bar) return framePreview[barFrame[bar]] == true end
+local function isPreview(bar) return Grad.IsSample(barFrame[bar]) end
 
 -- A sample bar's value and range, plain numbers only, else nil.
 local function sample(bar)
@@ -413,6 +415,14 @@ driver:SetScript("OnUpdate", function(self, elapsed)
         busy = true
         if now >= t then drained(bar) end
     end
+    -- A sample sends no health event, and Daylight UI can set its value after
+    -- the look applies, so its breakpoint follows the value from here.
+    for bar in pairs(lowOn) do
+        if isPreview(bar) and bar:IsVisible() then
+            busy = true
+            Health.LowAlpha(bar)
+        end
+    end
     if API.MotionOn() then
         for bar, t in pairs(demoAt) do
             if bar:IsVisible() then
@@ -522,24 +532,30 @@ end
 -- The breakpoint
 -- ---------------------------------------------------------------------
 
+-- The breakpoint lives in its own frame one level over the bar, under the
+-- frame's text. A texture wearing a gradient drops SetAlpha, and SetGradient
+-- refuses a secret alpha, so the frame carries the curve's alpha.
 local function lowTex(bar)
     local t = lowOf[bar]
     if not t then
-        t = bar:CreateTexture(nil, "ARTWORK", nil, 2)
+        local f = CreateFrame("Frame", nil, bar)
+        f:SetAllPoints(bar)
+        f:SetFrameLevel(bar:GetFrameLevel() + 1)
+        t = f:CreateTexture(nil, "ARTWORK")
         t:SetTexture(WHITE)
         Style.FollowFill(bar, t)
-        lowOf[bar] = t
+        lowOf[bar], lowFrameOf[bar] = t, f
     end
     return t
 end
 
 -- The picked color, flat, or two shades laid in the frame's gradient
 -- direction: the softened shade where the fill starts, the picked one at its
--- moving end.
+-- moving end. Full alpha; the frame fades it.
 local function paintLow(bar, t, c)
     local r, g, b = c.lowColor[1], c.lowColor[2], c.lowColor[3]
     if not c.two then
-        t:SetVertexColor(r, g, b)
+        t:SetVertexColor(r, g, b, 1)
         return
     end
     local sr, sg, sb = Style.Soften(r, g, b)
@@ -551,10 +567,11 @@ local function paintLow(bar, t, c)
     else Style.Gradient(t, o, sr, sg, sb, 1, r, g, b, 1) end
 end
 
+
 -- The breakpoint's alpha now. A real unit's comes from the curve, so a secret
 -- health is never read; a sample compares its own plain value.
 local function lowAlpha(bar)
-    local c, t = lowOn[bar], lowOf[bar]
+    local c, t = lowOn[bar], lowFrameOf[bar]
     if not (c and t) then return end
     local u = unitOf(bar)
     if u then
@@ -590,12 +607,13 @@ local function lowOnBar(bar, c)
     Style.SameMasks(t, bar:GetStatusBarTexture())
     paintLow(bar, t, c)
     lowAlpha(bar)
+    if isPreview(bar) then wake() end
 end
 
 local function lowOff(bar)
     lowOn[bar] = nil
-    local t = lowOf[bar]
-    if t then t:Hide() end
+    local f = lowFrameOf[bar]
+    if f then f:Hide() end
 end
 
 -- ---------------------------------------------------------------------
@@ -924,5 +942,14 @@ function Health.Start()
         if Health.Resolve(scope).ghostOn or (p and Health.Resolve(p).ghostOn) then Grad.Repaint(frame) end
     end
 end
+
+-- Test mode hands frames a sample or takes it back in its own handler, so the
+-- bars look again once that has run.
+me.On("TestModeChanged", function()
+    C_Timer.After(0, function()
+        if not Health.installed then return end
+        for bar in pairs(barScope) do apply(bar) end
+    end)
+end)
 
 me.On("Login", Health.Start)

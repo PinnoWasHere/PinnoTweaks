@@ -2,7 +2,7 @@
 ## Title: PinnoTweaks (DaylightUI Plugin)
 ## Notes: More ways to style Daylight UI's bars and action buttons, in Daylight UI's own look. Needs Daylight UI 2.4.1 or newer.
 ## Author: PinnoWasHere
-## Version: 0.1.0
+## Version: 0.1.1
 ## X-License: All Rights Reserved
 ## X-Curse-Project-ID: 1835025
 ## Dependencies: DaylightUI
