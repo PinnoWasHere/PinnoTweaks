@@ -44,8 +44,8 @@ local STEP = 0.05
 -- How long the ghost stays after a glide starts. The client eases with no
 -- duration to read; the probe Dev.ProbeHelper measures it.
 local GLIDE_SETTLE = 1
--- Preview demo: a hit every DEMO_EVERY seconds, of DEMO_HIT of the bar.
-local DEMO_EVERY, DEMO_HIT = 2.5, 0.2
+-- Preview demo: a hit every DEMO.every seconds, of DEMO.hit of the bar. Read live.
+Health.DEMO = { every = 2.5, hit = 0.2 }
 -- After a unit change, the helper tracks the value for this long and shows no
 -- ghost, while Daylight UI's fill grows in (Arrive, Motion.SLOW).
 local QUIET = API.Speed.SLOW
@@ -395,7 +395,7 @@ local function demoHit(bar)
     if not v then return end
     local h = helperOf[bar]
     h:SetMinMaxValues(lo, hi)
-    h:SetValue(math.min(hi, v + (hi - lo) * DEMO_HIT))
+    h:SetValue(math.min(hi, v + (hi - lo) * Health.DEMO.hit))
     hit(bar, true)
 end
 
@@ -418,7 +418,7 @@ driver:SetScript("OnUpdate", function(self, elapsed)
             if bar:IsVisible() then
                 busy = true
                 if now >= t then
-                    demoAt[bar] = now + DEMO_EVERY
+                    demoAt[bar] = now + Health.DEMO.every
                     demoHit(bar)
                 end
             end
@@ -505,7 +505,7 @@ local function ghostOn(bar, c)
     layGhost(bar)
     if not snapped[bar] then snap(bar) end
     if isPreview(bar) then
-        demoAt[bar] = demoAt[bar] or GetTime() + DEMO_EVERY
+        demoAt[bar] = demoAt[bar] or GetTime() + Health.DEMO.every
         wake()
     end
 end
